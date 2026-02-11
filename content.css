@@ -1,0 +1,48 @@
+/* Substack Internal Linking - Search Panel Styles */
+
+.substack-linker-panel {
+  position: fixed;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-height: 320px;
+  overflow-y: auto;
+  z-index: 2147483647;
+  min-width: 320px;
+  max-width: 420px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+}
+
+.substack-linker-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.1s ease;
+}
+
+.substack-linker-item:last-child {
+  border-bottom: none;
+}
+
+.substack-linker-item:hover,
+.substack-linker-item.selected {
+  background: #f5f5f5;
+}
+
+.substack-linker-item.selected {
+  background: #eee;
+}
+
+.substack-linker-title {
+  color: #333;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.substack-linker-empty {
+  padding: 16px;
+  text-align: center;
+  color: #888;
+}

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Substack Internal Linking Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="pages-wrapper">
+    <!-- Main Page -->
+    <div class="page page-main" id="page-main">
+      <h1>Substack Internal Linking</h1>
+      <p class="subtitle">Import your posts to enable internal linking (by typing "[[").</p>
+
+      <form id="settings-form">
+        <div class="form-group">
+          <label for="newsletter-url">Newsletter URL <span class="hint" data-tooltip="Used to automatically detect new posts via Substack's API"><img src="assets/circle-question-mark.svg" alt="?" class="hint-icon"></span></label>
+          <input type="text" id="newsletter-url" placeholder="newsletter.substack.com or newsletter.com" required>
+        </div>
+
+        <div class="form-group">
+          <label><code>posts.csv</code> file <span class="hint" data-tooltip="Substack's API can't fetch all posts — this file fills the gaps. Only needed once."><img src="assets/circle-question-mark.svg" alt="?" class="hint-icon"></span></label>
+          <p class="helper-text">
+            Upload the <code>posts.csv</code> file from your Substack export.
+            <a class="how-to-link" id="how-to-link">How to?</a>
+          </p>
+          <div class="file-upload">
+            <label class="file-upload-btn" for="csv-file">Choose File</label>
+            <input type="file" id="csv-file" accept=".csv" required>
+            <span class="file-name" id="file-name">No file selected</span>
+          </div>
+        </div>
+
+        <button type="submit">Save</button>
+      </form>
+
+      <div class="status" id="status"></div>
+
+      <div class="stats" id="stats">
+        <h3>Current Data</h3>
+        <p id="stats-url"></p>
+        <p id="stats-count"></p>
+        <button type="button" class="delete-btn" id="delete-btn">Delete All Data</button>
+      </div>
+    </div>
+
+    <!-- Instructions Page -->
+    <div class="page page-instructions" id="page-instructions">
+      <button class="back-btn" id="back-btn"><img src="assets/arrow-left.svg" alt="" class="back-icon"> Back</button>
+      <div class="instructions-header">
+        <div>
+          <h2 class="instructions-title">How to export your posts</h2>
+          <p class="instructions-subtitle">Follow these steps to get your <code>posts.csv</code> file from Substack.</p>
+        </div>
+        <div class="instructions-upload">
+          <label>Upload your posts.csv</label>
+          <div class="file-upload" style="margin-top: 8px;">
+            <label class="file-upload-btn" for="csv-file-instructions">Choose File</label>
+            <input type="file" id="csv-file-instructions" accept=".csv">
+            <span class="file-name" id="file-name-instructions">No file selected</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="steps-row">
+        <div class="step">
+          <p class="step-label">1. Go to your Dashboard</p>
+          <img src="assets/1.png" alt="Step 1: Click Dashboard">
+        </div>
+
+        <div class="step">
+          <p class="step-label">2. Click Settings</p>
+          <img src="assets/2.png" alt="Step 2: Click Settings">
+        </div>
+
+        <div class="step">
+          <p class="step-label">3. Go to Import / Export</p>
+          <img src="assets/3.png" alt="Step 3: Click Import/Export">
+        </div>
+
+        <div class="step">
+          <p class="step-label">4. Download & unzip, then find <code>posts.csv</code> in the export</p>
+          <img src="assets/4.png" alt="Step 4: Find posts.csv">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
