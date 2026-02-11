@@ -5,6 +5,13 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
+// Fetch with timeout (5 seconds)
+function fetchWithTimeout(url, ms = 5000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(id));
+}
+
 // Fetch posts from API or RSS and merge with existing
 async function fetchAndMergePosts() {
   const data = await chrome.storage.local.get(['newsletterUrl', 'posts']);
@@ -15,9 +22,10 @@ async function fetchAndMergePosts() {
 
   let newPosts = [];
 
-  // Try API first
+  // Try API first, then RSS fallback
+  let apiFailed = false;
   try {
-    const res = await fetch(`${newsletterUrl}/api/v1/archive`);
+    const res = await fetchWithTimeout(`${newsletterUrl}/api/v1/archive`);
     if (res.ok) {
       const apiData = await res.json();
       newPosts = apiData.map(item => ({
@@ -25,16 +33,21 @@ async function fetchAndMergePosts() {
         url: `${newsletterUrl}/p/${item.slug}`,
         date: item.post_date
       }));
+    } else {
+      apiFailed = true;
     }
   } catch (e) {
-    // API failed, try RSS
+    apiFailed = true;
+  }
+
+  // If API failed or returned no posts, try RSS
+  if (apiFailed || newPosts.length === 0) {
     try {
-      const res = await fetch(`${newsletterUrl}/feed`);
+      const res = await fetchWithTimeout(`${newsletterUrl}/feed`);
       if (res.ok) {
         const xml = await res.text();
-        // Parse RSS XML
         const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)];
-        newPosts = items.map(match => {
+        const rssPosts = items.map(match => {
           const content = match[1];
           const title = content.match(/<title><!\[CDATA\[(.*?)\]\]>|<title>(.*?)<\/title>/);
           const link = content.match(/<link>(.*?)<\/link>/);
@@ -45,13 +58,16 @@ async function fetchAndMergePosts() {
             date: pubDate?.[1] ? new Date(pubDate[1]).toISOString() : null
           };
         }).filter(p => p.url);
+        if (rssPosts.length > 0) newPosts = rssPosts;
       }
     } catch (e2) {
-      return { added: 0, error: 'Failed to fetch updates' };
+      // Both failed
     }
   }
 
-  if (newPosts.length === 0) return { added: 0 };
+  if (newPosts.length === 0) {
+    return { added: 0, total: existingPosts.length, error: 'Could not fetch posts' };
+  }
 
   // Merge with existing posts (dedupe by URL)
   const existingUrls = new Set(existingPosts.map(p => p.url));

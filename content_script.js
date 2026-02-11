@@ -39,6 +39,13 @@
     })).filter(p => p.url);
   }
 
+  // Fetch with timeout (5 seconds)
+  function fetchWithTimeout(url, ms = 5000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), ms);
+    return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(id));
+  }
+
   // Fetch new posts from API or RSS
   async function fetchNewPosts() {
     if (hasFetchedThisSession) return;
@@ -54,7 +61,7 @@
 
     // Try API first
     try {
-      const res = await fetch(`${newsletterUrl}/api/v1/archive`);
+      const res = await fetchWithTimeout(`${newsletterUrl}/api/v1/archive`);
       if (res.ok) {
         const apiData = await res.json();
         newPosts = apiData.map(item => ({
@@ -66,7 +73,7 @@
     } catch (e) {
       // API failed, try RSS
       try {
-        const res = await fetch(`${newsletterUrl}/feed`);
+        const res = await fetchWithTimeout(`${newsletterUrl}/feed`);
         if (res.ok) {
           const xml = await res.text();
           newPosts = parseRSS(xml);
@@ -180,6 +187,8 @@
     panel.style.left = `${left}px`;
   }
 
+  const ICON_X = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+
   // Render search results
   function renderResults(filteredPosts) {
     if (!panel) return;
@@ -192,12 +201,15 @@
     panel.innerHTML = filteredPosts.map((post, i) => `
       <div class="substack-linker-item${i === selectedIndex ? ' selected' : ''}" data-index="${i}">
         <div class="substack-linker-title">${escapeHtml(post.title)}</div>
+        <button class="substack-linker-remove" data-url="${escapeHtml(post.url)}">${ICON_X}</button>
       </div>
     `).join('');
 
     // Add click handlers
     panel.querySelectorAll('.substack-linker-item').forEach(item => {
       item.addEventListener('mousedown', (e) => {
+        // Ignore if clicking the remove button
+        if (e.target.closest('.substack-linker-remove')) return;
         e.preventDefault();
         const index = parseInt(item.dataset.index, 10);
         selectPost(filteredPosts[index]);
@@ -208,6 +220,60 @@
         updateSelection();
       });
     });
+
+    // Add remove button handlers
+    panel.querySelectorAll('.substack-linker-remove').forEach(btn => {
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const url = btn.dataset.url;
+        const post = filteredPosts.find(p => p.url === url);
+        if (post) confirmRemovePost(post);
+      });
+    });
+  }
+
+  // Show confirmation to remove a post
+  function confirmRemovePost(post) {
+    if (!panel) return;
+
+    panel.innerHTML = `
+      <div class="substack-linker-confirm">
+        <div class="substack-linker-confirm-title">Remove "${escapeHtml(post.title)}" from the link panel?</div>
+        <div class="substack-linker-confirm-subtitle">This won't delete the post from Substack.</div>
+        <div class="substack-linker-confirm-actions">
+          <button class="substack-linker-confirm-remove">Remove</button>
+          <button class="substack-linker-confirm-cancel">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    panel.querySelector('.substack-linker-confirm-remove').addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      removePost(post.url);
+    });
+
+    panel.querySelector('.substack-linker-confirm-cancel').addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const filteredPosts = filterPosts(triggerContext?.query || '');
+      renderResults(filteredPosts);
+    });
+  }
+
+  // Remove a post from storage and re-render
+  async function removePost(url) {
+    posts = posts.filter(p => p.url !== url);
+    await chrome.storage.local.set({ posts });
+
+    const filteredPosts = filterPosts(triggerContext?.query || '');
+    if (filteredPosts.length > 0) {
+      selectedIndex = Math.min(selectedIndex, filteredPosts.length - 1);
+      renderResults(filteredPosts);
+    } else {
+      panel.innerHTML = '<div class="substack-linker-empty">No posts found</div>';
+    }
   }
 
   // Escape HTML for safe rendering

@@ -124,6 +124,13 @@ function buildPostData(rows, newsletterUrl) {
   return posts;
 }
 
+// Format a timestamp as "Jan 12, 2025"
+function formatDate(timestamp) {
+  return new Date(timestamp).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric'
+  });
+}
+
 // DOM elements
 const form = document.getElementById('settings-form');
 const newsletterUrlInput = document.getElementById('newsletter-url');
@@ -134,6 +141,16 @@ const statsDiv = document.getElementById('stats');
 const statsUrl = document.getElementById('stats-url');
 const statsCount = document.getElementById('stats-count');
 const deleteBtn = document.getElementById('delete-btn');
+const saveBtn = document.getElementById('save-btn');
+
+// Track whether form has unsaved changes
+let formDirty = false;
+
+// Enable/disable save button based on form state
+function updateSaveButton() {
+  const hasUrl = newsletterUrlInput.value.trim().length > 0;
+  saveBtn.disabled = !(hasUrl && formDirty);
+}
 
 // Page navigation elements
 const pageMain = document.getElementById('page-main');
@@ -172,6 +189,13 @@ fileInput.addEventListener('change', () => {
   } else {
     fileNameSpan.textContent = 'No file selected';
   }
+  formDirty = true;
+  updateSaveButton();
+});
+
+newsletterUrlInput.addEventListener('input', () => {
+  formDirty = true;
+  updateSaveButton();
 });
 
 // Sync instruction page file input with main form
@@ -187,6 +211,8 @@ fileInputInstructions.addEventListener('change', () => {
 
     // Navigate back to main page
     showMain();
+    formDirty = true;
+    updateSaveButton();
   }
 });
 
@@ -198,7 +224,7 @@ function showStatus(message, isError = false) {
 
 // Load and display current stats
 async function loadStats() {
-  const data = await chrome.storage.local.get(['newsletterUrl', 'posts']);
+  const data = await chrome.storage.local.get(['newsletterUrl', 'posts', 'csvUploadDate']);
 
   if (data.newsletterUrl && data.posts && data.posts.length > 0) {
     statsUrl.textContent = `Newsletter: ${data.newsletterUrl}`;
@@ -207,6 +233,12 @@ async function loadStats() {
 
     // Pre-fill URL input
     newsletterUrlInput.value = data.newsletterUrl.replace('https://', '');
+    updateSaveButton();
+  }
+
+  // Show persisted upload date if no new file is selected
+  if (data.csvUploadDate && fileInput.files.length === 0) {
+    fileNameSpan.textContent = `posts.csv (uploaded ${formatDate(data.csvUploadDate)})`;
   }
 }
 
@@ -221,33 +253,50 @@ form.addEventListener('submit', async (e) => {
   }
 
   const file = fileInput.files[0];
-  if (!file) {
-    showStatus('Please select a CSV file.', true);
-    return;
-  }
 
   try {
-    const content = await file.text();
-    const rows = parseCSV(content);
+    // If a CSV file is selected, parse and save it
+    if (file) {
+      const content = await file.text();
+      const rows = parseCSV(content);
 
-    if (rows.length === 0) {
-      showStatus('No published posts found in the CSV file.', true);
-      return;
+      if (rows.length === 0) {
+        showStatus('No published posts found in the CSV file.', true);
+        return;
+      }
+
+      const posts = buildPostData(rows, newsletterUrl);
+      const csvUploadDate = Date.now();
+      await chrome.storage.local.set({ newsletterUrl, posts, csvUploadDate });
+
+      // Update file name display with upload date
+      fileNameSpan.textContent = `posts.csv (uploaded ${formatDate(csvUploadDate)})`;
+    } else {
+      // No file — just save the URL
+      await chrome.storage.local.set({ newsletterUrl });
     }
 
-    const posts = buildPostData(rows, newsletterUrl);
-
-    // Save to storage
-    await chrome.storage.local.set({ newsletterUrl, posts });
-
-    // Fetch from API/RSS to fill in any posts not in the CSV
+    // Fetch from API/RSS
+    let fetchFailed = false;
     try {
       const result = await chrome.runtime.sendMessage({ action: 'fetchPosts' });
-      const total = result?.total || posts.length;
-      showStatus(`Successfully imported ${total} posts. You can close this page now.`);
+      if (result?.error) fetchFailed = true;
     } catch (e) {
-      showStatus(`Successfully imported ${posts.length} posts. You can close this page now.`);
+      fetchFailed = true;
     }
+
+    const data = await chrome.storage.local.get(['posts']);
+    const total = data.posts?.length || 0;
+
+    if (fetchFailed && total === 0) {
+      showStatus('Could not fetch posts. Please make sure the newsletter URL is correct.', true);
+    } else if (fetchFailed) {
+      showStatus(`Saved ${total} posts, but could not reach the newsletter. Please check the URL.`, true);
+    } else {
+      showStatus(`Successfully imported ${total} posts. You can close this page now.`);
+    }
+    formDirty = false;
+    updateSaveButton();
     loadStats();
 
   } catch (error) {

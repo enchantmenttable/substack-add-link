@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Substack Internal Linking",
   "version": "1.0.0",
-  "description": "Insert links to your Substack posts using [[wiki-link syntax",
-  "permissions": ["storage", "unlimitedStorage"],
+  "description": "Link to your existing Substack posts by typing [[ in the editor",
+  "permissions": ["storage"],
   "background": {
     "service_worker": "background.js"
   },

@@ -18,21 +18,22 @@
           <label for="newsletter-url">Newsletter URL <span class="hint" data-tooltip="Used to automatically detect new posts via Substack's API"><img src="assets/circle-question-mark.svg" alt="?" class="hint-icon"></span></label>
           <input type="text" id="newsletter-url" placeholder="newsletter.substack.com or newsletter.com" required>
         </div>
-
         <div class="form-group">
           <label><code>posts.csv</code> file <span class="hint" data-tooltip="Substack's API can't fetch all posts — this file fills the gaps. Only needed once."><img src="assets/circle-question-mark.svg" alt="?" class="hint-icon"></span></label>
           <p class="helper-text">
             Upload the <code>posts.csv</code> file from your Substack export.
             <a class="how-to-link" id="how-to-link">How to?</a>
+            <br></br>
+            This step is not required if you have less than 20 posts.
           </p>
           <div class="file-upload">
             <label class="file-upload-btn" for="csv-file">Choose File</label>
-            <input type="file" id="csv-file" accept=".csv" required>
+            <input type="file" id="csv-file" accept=".csv">
             <span class="file-name" id="file-name">No file selected</span>
           </div>
         </div>
 
-        <button type="submit">Save</button>
+        <button type="submit" id="save-btn" disabled>Save</button>
       </form>
 
       <div class="status" id="status"></div>
