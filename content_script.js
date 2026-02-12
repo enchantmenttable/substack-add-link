@@ -59,19 +59,26 @@
 
     let newPosts = [];
 
-    // Try API first
+    // Fetch first page only (to catch recently published posts)
+    let apiFailed = false;
     try {
-      const res = await fetchWithTimeout(`${newsletterUrl}/api/v1/archive`);
-      if (res.ok) {
-        const apiData = await res.json();
-        newPosts = apiData.map(item => ({
-          title: item.title,
-          url: `${newsletterUrl}/p/${item.slug}`,
-          date: item.post_date
-        }));
+      const res = await fetchWithTimeout(`${newsletterUrl}/api/v1/archive?offset=0`);
+      if (!res.ok) {
+        apiFailed = true;
+      } else {
+        const batch = await res.json();
+        if (Array.isArray(batch)) {
+          for (const item of batch) {
+            newPosts.push({ title: item.title, url: `${newsletterUrl}/p/${item.slug}`, date: item.post_date });
+          }
+        }
       }
     } catch (e) {
-      // API failed, try RSS
+      apiFailed = true;
+    }
+
+    // If API failed or returned no posts, try RSS
+    if (apiFailed || newPosts.length === 0) {
       try {
         const res = await fetchWithTimeout(`${newsletterUrl}/feed`);
         if (res.ok) {
@@ -403,6 +410,7 @@
 
       case 'Escape':
         e.preventDefault();
+        e.stopPropagation();
         hidePanel();
         break;
 

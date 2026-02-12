@@ -18,8 +18,10 @@ h1 {
 }
 
 .subtitle {
+  font-size: 13px;
   color: #666;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
+  margin-top: 4px;
 }
 
 .form-group {
@@ -79,7 +81,8 @@ label {
 .helper-text {
   font-size: 13px;
   color: #666;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  margin-top: 4px;
 }
 
 input[type="text"] {
@@ -163,6 +166,31 @@ button[type="submit"]:disabled {
   display: block;
   background: #ffebee;
   color: #c62828;
+}
+
+.status.loading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.stop-btn {
+  background: none;
+  border: 1px solid #e65100;
+  color: #e65100;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-left: 12px;
+}
+
+.stop-btn:hover {
+  background: #e65100;
+  color: #fff;
 }
 
 .stats {

@@ -217,9 +217,13 @@ fileInputInstructions.addEventListener('change', () => {
 });
 
 // Show status message
-function showStatus(message, isError = false) {
-  statusDiv.textContent = message;
-  statusDiv.className = 'status ' + (isError ? 'error' : 'success');
+function showStatus(message, isError = false, type = null) {
+  statusDiv.className = 'status ' + (type || (isError ? 'error' : 'success'));
+  if (type === 'loading') {
+    statusDiv.innerHTML = `<span>${message}</span><button class="stop-btn" id="stop-fetch-btn">Stop</button>`;
+  } else {
+    statusDiv.textContent = message;
+  }
 }
 
 // Load and display current stats
@@ -242,9 +246,17 @@ async function loadStats() {
   }
 }
 
+// Disable/enable form fields during fetch
+function setFormLocked(locked) {
+  newsletterUrlInput.disabled = locked;
+  fileInput.disabled = locked;
+  saveBtn.disabled = locked;
+}
+
 // Form submission
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
+  document.activeElement?.blur();
 
   const newsletterUrl = parseNewsletterUrl(newsletterUrlInput.value);
   if (!newsletterUrl) {
@@ -276,7 +288,32 @@ form.addEventListener('submit', async (e) => {
       await chrome.storage.local.set({ newsletterUrl });
     }
 
-    // Fetch from API/RSS
+    // Lock form and show loading status
+    setFormLocked(true);
+    showStatus('Fetching posts...', false, 'loading');
+
+    // Set up stop button
+    let stopped = false;
+    const stopBtn = document.getElementById('stop-fetch-btn');
+    stopBtn?.addEventListener('click', () => {
+      stopped = true;
+      chrome.runtime.sendMessage({ action: 'stopFetch' }).catch(() => {});
+      showStatus('Stopping...', false, 'loading');
+    });
+
+    const onProgress = (message) => {
+      if (message.action === 'fetchProgress' && !stopped) {
+        showStatus(`Fetching posts... (${message.count} found)`, false, 'loading');
+        // Re-attach stop button listener after innerHTML update
+        document.getElementById('stop-fetch-btn')?.addEventListener('click', () => {
+          stopped = true;
+          chrome.runtime.sendMessage({ action: 'stopFetch' }).catch(() => {});
+          showStatus('Stopping...', false, 'loading');
+        });
+      }
+    };
+    chrome.runtime.onMessage.addListener(onProgress);
+
     let fetchFailed = false;
     try {
       const result = await chrome.runtime.sendMessage({ action: 'fetchPosts' });
@@ -284,11 +321,15 @@ form.addEventListener('submit', async (e) => {
     } catch (e) {
       fetchFailed = true;
     }
+    chrome.runtime.onMessage.removeListener(onProgress);
+    setFormLocked(false);
 
     const data = await chrome.storage.local.get(['posts']);
     const total = data.posts?.length || 0;
 
-    if (fetchFailed && total === 0) {
+    if (stopped && total > 0) {
+      showStatus(`Saved ${total} posts found so far. You can close this page now.`);
+    } else if (fetchFailed && total === 0) {
       showStatus('Could not fetch posts. Please make sure the newsletter URL is correct.', true);
     } else if (fetchFailed) {
       showStatus(`Saved ${total} posts, but could not reach the newsletter. Please check the URL.`, true);
@@ -300,6 +341,7 @@ form.addEventListener('submit', async (e) => {
     loadStats();
 
   } catch (error) {
+    setFormLocked(false);
     showStatus(`Error: ${error.message}`, true);
   }
 });

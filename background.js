@@ -12,8 +12,12 @@ function fetchWithTimeout(url, ms = 5000) {
   return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(id));
 }
 
+// Abort flag for stopping fetch
+let fetchStopped = false;
+
 // Fetch posts from API or RSS and merge with existing
 async function fetchAndMergePosts() {
+  fetchStopped = false;
   const data = await chrome.storage.local.get(['newsletterUrl', 'posts']);
   const { newsletterUrl } = data;
   const existingPosts = data.posts || [];
@@ -22,22 +26,50 @@ async function fetchAndMergePosts() {
 
   let newPosts = [];
 
-  // Try API first, then RSS fallback
+  // Try API first (with parallel pagination), then RSS fallback
   let apiFailed = false;
   try {
-    const res = await fetchWithTimeout(`${newsletterUrl}/api/v1/archive`);
-    if (res.ok) {
-      const apiData = await res.json();
-      newPosts = apiData.map(item => ({
-        title: item.title,
-        url: `${newsletterUrl}/p/${item.slug}`,
-        date: item.post_date
-      }));
-    } else {
+    // Fetch first page to get page size
+    const firstRes = await fetchWithTimeout(`${newsletterUrl}/api/v1/archive?offset=0`);
+    if (!firstRes.ok) {
       apiFailed = true;
+    } else {
+      const firstBatch = await firstRes.json();
+      if (Array.isArray(firstBatch) && firstBatch.length > 0) {
+        const pageSize = firstBatch.length;
+        for (const item of firstBatch) {
+          newPosts.push({ title: item.title, url: `${newsletterUrl}/p/${item.slug}`, date: item.post_date });
+        }
+        chrome.runtime.sendMessage({ action: 'fetchProgress', count: newPosts.length }).catch(() => {});
+
+        // Fetch remaining pages in parallel batches of 5
+        let offset = pageSize;
+        let hasMore = true;
+        while (hasMore && !fetchStopped) {
+          const offsets = [];
+          for (let i = 0; i < 5 && hasMore; i++) {
+            offsets.push(offset);
+            offset += pageSize;
+          }
+          const results = await Promise.all(
+            offsets.map(o =>
+              fetchWithTimeout(`${newsletterUrl}/api/v1/archive?offset=${o}`)
+                .then(r => r.ok ? r.json() : [])
+                .catch(() => [])
+            )
+          );
+          for (const batch of results) {
+            if (!Array.isArray(batch) || batch.length === 0) { hasMore = false; break; }
+            for (const item of batch) {
+              newPosts.push({ title: item.title, url: `${newsletterUrl}/p/${item.slug}`, date: item.post_date });
+            }
+          }
+          chrome.runtime.sendMessage({ action: 'fetchProgress', count: newPosts.length }).catch(() => {});
+        }
+      }
     }
   } catch (e) {
-    apiFailed = true;
+    if (newPosts.length === 0) apiFailed = true;
   }
 
   // If API failed or returned no posts, try RSS
@@ -87,6 +119,9 @@ async function fetchAndMergePosts() {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'fetchPosts') {
     fetchAndMergePosts().then(sendResponse);
-    return true; // keep channel open for async response
+    return true;
+  }
+  if (message.action === 'stopFetch') {
+    fetchStopped = true;
   }
 });

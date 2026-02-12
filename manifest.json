@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Substack Internal Linking",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Link to your existing Substack posts by typing [[ in the editor",
   "permissions": ["storage"],
+  "host_permissions": ["https://*/*"],
   "background": {
     "service_worker": "background.js"
   },
