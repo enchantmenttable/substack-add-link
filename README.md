@@ -6,3 +6,4 @@ Doing so is not hard, but it kind of breaks the flow and annoying (the fact that
 
 So I built an extension that lets you type “[[“ in the Substack editor, then select an older post from a search panel to insert the link.
 
+<img witdh="800px" src="https://github.com/enchantmenttable/substack-add-link/blob/main/assets/screenshot.png?raw=true">
